@@ -1,0 +1,630 @@
+<!DOCTYPE html>
+<html>
+<meta charset="utf-8">
+  
+<style>
+.tooltip {
+position: absolute; 
+width: 200px; 
+height: 28px; 
+pointer-events: none;
+}
+
+.rectangle {
+	fill: steelblue;
+}
+
+.axis path, .axis line {
+fill: none;
+stroke: #000;
+shape-rendering:
+crispEdges;
+}
+
+
+</style>
+
+
+<body>
+  <h5> You can get the exact value of a bar by hovering your cursor above the bar. </h5>
+  <svg class="chart"></svg>
+  
+<h4> These dropdown widgets list the unique values of various variables in the dataset. <br> You can filter the dataset by selecting values in each widget.<br> If you select 1-31 values in a widget, the widget's variable will be available to display on the x-axis in the two selection widgets below. </h4>
+
+<h6> Selecting below twelve values for the publisher dropdown is highly recommended to prevent overflow on the visualization. </h6>
+
+<h6> Note: On Mac, hold command and click to deselect a selected dropdown option. On Windows, hold control and click to deselect a selected dropdown option. </h6>
+  
+<select id='platform_multiSelector' multiple>
+<optgroup label = "Console Platforms">
+</select>
+  
+<select id='publisher_multiSelector' multiple>
+<optgroup label = "Game Publishers">
+</select>
+
+<select id='genre_multiSelector' multiple>
+<optgroup label = "Genres">
+</select>
+
+<select id='year_multiSelector' multiple>
+<optgroup label = "Years">
+</select>
+
+<select id='exclusivity_multiSelector' multiple>
+<optgroup label = "Console Platform Exclusivity">
+</select>
+
+<h4> Use these two selection widgets to modify the variables displayed on the x-axis and y-axis. </h4>
+
+  
+</body>
+
+<script src="http://d3js.org/d3.v5.min.js"></script>
+<script src="https://ajax.googleapis.com/ajax/libs/jquery/3.4.1/jquery.min.js"></script>
+<script type="text/javascript" src="https://stackpath.bootstrapcdn.com/bootstrap/4.3.1/js/bootstrap.min.js"></script>
+
+<script src="https://unpkg.com/d3-simple-slider"></script>
+<script src="https://d3js.org/d3-array.v2.min.js"></script>
+
+
+<script>
+
+  var margin = {top: 20, right: 20, bottom: 20, left: 50},
+      width = +800- margin.left - margin.right,
+    height = +800 - margin.top - margin.bottom
+
+
+
+  var svg = d3.select("svg")
+	.style("width", '800px')
+  	.style("height", '600px') //when height = 2000 px and height of rect is = return height - y(d[1]);
+     .append("g").attr("transform", "translate(" + margin.left + "," +  "550)");
+     //.append("g").attr("transform", "translate(" + margin.left + "," + margin.top + ")");
+     
+  var tooltip = d3.select("body").append("div")
+   .attr("class", "tooltip") 
+   .style("opacity", 0);
+  
+  var dataset;
+  d3.csv("Vgsales_final.csv").then(function(games) {
+      games.forEach(function(d) {
+      d.rank = +d.rank;
+      d.name = d.name;
+      d.platform = d.platform;
+      d.year = +d.year; 
+      d.genre = d.genre;
+      d.publisher = d.publisher;
+      d.na_sales = +d.na_sales;
+      d.eu_sales = +d.eu_sales;
+      d.jp_sales = +d.jp_sales;
+      d.other_sales = +d.other_sales;
+      d.global_sales = +d.global_sales;
+      d.platform_exclusive = d.platform_exclusive; 
+    });
+    dataset = games;
+  });
+
+   setTimeout(function(){
+  
+  //var _data = d3.rollups(dataset, v => d3.sum(v, d => d.global_sales), d => d.genre);
+  var _data_global_sales_sum_by_genre = d3.rollups(dataset, v => d3.sum(v, d => d.global_sales), d => d.genre);
+  var _data_count = d3.rollups(dataset, v => v.length, d => d.genre);
+  
+  /**********
+ * Dataset values per attribute *
+ **********/
+ 
+  var dataset_platform = d3.set(dataset, function(d) { return d.platform}).values();
+  dataset_platform = dataset_platform.sort();
+  for (i in dataset_platform){
+     var option = document.createElement("option");
+    option.text = dataset_platform[i];
+    option.setAttribute("id", dataset_platform[i]);
+     document.getElementById('platform_multiSelector').add(option);
+  }
+  
+  
+  var dataset_publisher = d3.set(dataset, function(d) { return d.publisher}).values();
+  dataset_publisher = dataset_publisher.sort();
+  for (i in dataset_publisher){
+     var option = document.createElement("option");
+    option.text = dataset_publisher[i];
+    option.setAttribute("id", dataset_publisher[i]);
+     document.getElementById('publisher_multiSelector').add(option);
+  }
+  
+  var dataset_genre = d3.set(dataset, function(d) { return d.genre}).values();
+  dataset_genre = dataset_genre.sort();
+  for (i in dataset_genre){
+     var option = document.createElement("option");
+    option.text = dataset_genre[i];
+    option.setAttribute("id", dataset_genre[i]);
+     document.getElementById('genre_multiSelector').add(option);
+  }
+  
+  var dataset_year = d3.set(dataset, function(d) { return d.year}).values();
+  dataset_year = dataset_year.sort();
+  for (i in dataset_year){
+     var option = document.createElement("option");
+    option.text = dataset_year[i];
+    option.setAttribute("id", dataset_year[i]);
+     document.getElementById('year_multiSelector').add(option);
+  }
+  
+  var dataset_exclusivity = d3.set(dataset, function(d) { return d.platform_exclusive}).values();
+  for (i in dataset_exclusivity){
+     var option = document.createElement("option");
+    option.text = dataset_exclusivity[i];
+    option.setAttribute("id", dataset_exclusivity[i]);
+     document.getElementById('exclusivity_multiSelector').add(option);
+  }
+  
+  /**********
+ **********/
+ 
+ /**********
+ * Dataset attribute value selector *
+ **********/
+ 
+ d3.select('#platform_multiSelector')
+  .on('change', function () {selectFunction("platform_multiSelector");
+  });
+  
+  d3.select('#publisher_multiSelector')
+  .on('change', function () {
+  selectFunction("publisher_multiSelector");
+});
+  
+  d3.select('#genre_multiSelector')
+  .on('change', function () {selectFunction("genre_multiSelector");
+  });
+  
+  d3.select('#year_multiSelector')
+  .on('change', function () {selectFunction("year_multiSelector");
+  });
+  
+  d3.select('#exclusivity_multiSelector')
+  .on('change', function () {selectFunction("exclusivity_multiSelector");
+  });
+  
+  //
+ 
+   /**********
+ **********/
+ 
+ var x_axis_selector_fields = [];
+ 
+ var selected_platform_array = [];
+ var selected_publisher_array = [];
+ var selected_genre_array = [];
+ var selected_year_array = [];
+ var selected_exclusive_array = [];
+ 
+var selected_selectorID;
+
+var x_selected = "genre";
+var y_selected = "Number of Observations";
+
+var filtered_dataset = dataset;
+
+var _dataset = d3.rollups(filtered_dataset, v => v.length, d => d["genre"]);
+
+ 
+  /**********
+ * x_axis_selector code  *
+ **********/
+ function update_x_axis_selector_fields(){
+    var _x_axis_selector_fields = [];
+     _x_axis_selector_fields.push("Genre");
+     _x_axis_selector_fields.push("Console Platform");
+     _x_axis_selector_fields.push("Platform Exclusivity");
+     
+    /*
+    if(selected_platform_array.length > 0 && selected_platform_array.length <= 12){
+        _x_axis_selector_fields.push("Console Platform");
+        console.log(_x_axis_selector_fields);
+      }
+      */
+    if(selected_publisher_array.length > 0 && selected_publisher_array.length <= 31){
+        _x_axis_selector_fields.push("Game Publisher");
+        console.log(_x_axis_selector_fields);
+      }
+    /*
+     if(selected_genre_array.length > 0 && selected_genre_array.length <= 12){
+        _x_axis_selector_fields.push("Genre");
+      }
+      */
+    if(selected_year_array.length > 0 && selected_year_array.length <= 31){
+        _x_axis_selector_fields.push("Year");
+        console.log(_x_axis_selector_fields);
+      }
+    /*
+     if(selected_exclusive_array.length > 0 && selected_exclusive_array.length <= 12){
+        _x_axis_selector_fields.push("Platform Exclusivity");
+      }*/
+    x_axis_selector_fields = _x_axis_selector_fields;
+    
+    d3.selectAll("#x_axis_selector").remove();
+
+    var x_axis_selector = d3.select("body")
+		.append("select")
+		.attr("id", "x_axis_selector")
+		.selectAll("option")
+		.data(x_axis_selector_fields)
+		.enter().append("option")
+		.text(function(d) { 
+		  return d; 
+		  })
+		.attr("value", function (d) {
+			return d;
+		});
+		
+  d3.select("#x_axis_selector")
+	  .on("change", function(d) {
+	   
+	   if(this.value == "Console Platform"){
+        x_selected = "platform";
+        selected_selectorID = "platform_multiSelector";
+      }
+     else if(this.value == "Game Publisher"){
+        x_selected = "publisher";
+        selected_selectorID = "publisher_multiSelector";
+      }
+     else if(this.value == "Genre"){
+        x_selected = "genre";
+        selected_selectorID = "genre_multiSelector";
+      }
+     else if(this.value == "Year"){
+        x_selected = "year";
+        selected_selectorID = "year_multiSelector";
+      }
+     else if(this.value == "Platform Exclusivity"){
+        x_selected = "platform_exclusive";
+        selected_selectorID = "exclusivity_multiSelector";
+      }
+      
+    //call _dataset_update() to re-render the bar chart with new x_selected 
+    _dataset_update();
+	  });
+}
+   /**********
+ **********/
+ 
+update_x_axis_selector_fields();
+ 
+ /**********
+ * Dataset attribute value selector - Listener Helper functions   *
+ **********/
+
+ 
+ //Performs piped filtering on dataset based on values selected from the dropdowns. 
+  function update(){
+   var _filtered_dataset = dataset;
+    if(selected_platform_array.length >= 1){
+        _filtered_dataset = _filtered_dataset.filter(function(d) {
+	      return selected_platform_array.includes(d.platform);
+        });
+      }
+    if(selected_publisher_array.length >= 1){
+        _filtered_dataset = _filtered_dataset.filter(function(d) {
+	      return selected_publisher_array.includes(d.publisher);
+        });
+      }
+    if(selected_genre_array.length >= 1){
+        _filtered_dataset = _filtered_dataset.filter(function(d) {
+	      return selected_genre_array.includes(d.genre);
+        });
+      }
+    if(selected_year_array.length >= 1){
+        _filtered_dataset = _filtered_dataset.filter(function(d) {
+	      return selected_year_array.includes(d.year);
+        });
+      }
+    if(selected_exclusive_array.length >= 1){
+        _filtered_dataset = _filtered_dataset.filter(function(d) {
+	      return selected_exclusive_array.includes(d.platform_exclusive);
+        });
+      }
+    filtered_dataset = _filtered_dataset;
+    ////call _dataset_update() to re-render the bar chart with new filtered_dataset 
+    _dataset_update();
+ }
+ 
+ // this function updates the array of values for the selectorID tagging the dropdown for each attribute
+function _selectFunction(_selectorID_parameter, _selected1_parameter){
+  if(_selectorID_parameter == "platform_multiSelector"){
+      selected_platform_array = _selected1_parameter; 
+  }
+
+  else if(_selectorID_parameter == "publisher_multiSelector"){
+      selected_publisher_array = _selected1_parameter; 
+  }
+
+  else if(_selectorID_parameter == "genre_multiSelector"){
+      selected_genre_array = _selected1_parameter; 
+  }
+
+  else if(_selectorID_parameter == "year_multiSelector"){
+      selected_year_array = _selected1_parameter;
+  }
+
+  else if(_selectorID_parameter == "exclusivity_multiSelector"){
+      selected_exclusive_array = _selected1_parameter;
+  }
+  update();
+}
+
+ var selected1 = [];
+ var select_limit = 31; 
+ 
+ function selectFunction(_selectorID) {
+  var x = document.getElementById(_selectorID);
+  var _selected1 = [];
+   
+  
+    for (var i = 0; i < x.length; i++) {
+        if (x[i].selected && _selectorID != 'year_multiSelector') {
+          _selected1.push(x[i].value);
+        }
+        else if (x[i].selected && _selectorID == 'year_multiSelector') {
+          var year_value = Number(x[i].value);
+          _selected1.push(year_value);
+        }
+    }
+
+    //only activate this if current _selectorID is in x_axis_selector 
+    if(_selected1.length >= select_limit){
+      _selectFunction(_selectorID, _selected1);
+      if(_selectorID == selected_selectorID){
+        for (var i = 0; i < x.length; i++) {
+          if (x[i].selected == false) {
+            document.getElementById(_selectorID).options[i].disabled = true;
+          }
+        }
+        alert("You selected too many choices. Please select only twelve or less choices.");
+      }
+      else if(_selectorID != selected_selectorID){
+        for (var i = 0; i < x.length; i++) {
+          if (x[i].selected == false) {
+            document.getElementById(_selectorID).options[i].disabled = false;
+          }
+        }
+      }
+    }
+    
+  else if(_selected1.length < select_limit){
+      //selected1 = _selected1;
+      _selectFunction(_selectorID, _selected1);
+      
+      for (var i = 0; i < x.length; i++) {
+        if (x[i].selected == false) {
+          document.getElementById(_selectorID).options[i].disabled = false;
+        }
+     }
+    }
+  update_x_axis_selector_fields();
+}
+
+   /**********
+ **********/
+ 
+function _dataset_update(){
+  if(y_selected == "Number of Observations"){
+        _dataset = d3.rollups(filtered_dataset, v => v.length, d => d[x_selected]);
+        if(_dataset.length <= 31){
+           bar_chart_render();
+        }
+      }
+     else if(y_selected == "Global Sales in Millions USD"){
+        _dataset = d3.rollups(filtered_dataset, v => d3.sum(v, d => d.global_sales), d => d[x_selected]);
+        if(_dataset.length <= 31){
+           bar_chart_render();
+        }
+      }
+    else if(y_selected == "North America Sales in Millions USD"){
+        _dataset = d3.rollups(filtered_dataset, v => d3.sum(v, d => d.na_sales), d => d[x_selected]);
+        if(_dataset.length <= 31){
+           bar_chart_render();
+        }
+      }
+    else if(y_selected == "Europe Sales in Millions USD"){
+        _dataset = d3.rollups(filtered_dataset, v => d3.sum(v, d => d.eu_sales), d => d[x_selected]);
+        if(_dataset.length <= 31){
+           bar_chart_render();
+        }
+      }
+    else if(y_selected == "Japan Sales in Millions USD"){
+        _dataset = d3.rollups(filtered_dataset, v => d3.sum(v, d => d.jp_sales), d => d[x_selected]);
+        if(_dataset.length <= 31){
+           bar_chart_render();
+        }
+      }
+}
+ 
+ /**********
+ * y_axis_selector code  *
+ **********/
+    var _y_axis_selector_fields = ["Number of Observations","Global Sales in Millions USD", "North America Sales in Millions USD", "Europe Sales in Millions USD", "Japan Sales in Millions USD"];
+	   
+	  var y_axis_selector = d3.select("body")
+		.append("select")
+		.attr("id", "y_axis_selector")
+		.selectAll("option")
+		.data(_y_axis_selector_fields)
+		.enter().append("option")
+		.text(function(d) { 
+		  return d; 
+		  })
+		.attr("value", function (d) {
+			return d;
+		});
+		
+		//below code may be redundant, should be able to get same effect by calling _dataset_update() after assigning this.value to y_selected
+		
+		d3.select("#y_axis_selector")
+	  .on("change", function(d) {
+	    y_selected = this.value;
+	   if(y_selected == "Number of Observations"){
+        _dataset = d3.rollups(filtered_dataset, v => v.length, d => d[x_selected]);
+        bar_chart_render();
+      }
+     else if(y_selected == "Global Sales in Millions USD"){
+        _dataset = d3.rollups(filtered_dataset, v => d3.sum(v, d => d.global_sales), d => d[x_selected]);
+        bar_chart_render();
+      }
+    else if(y_selected == "North America Sales in Millions USD"){
+        _dataset = d3.rollups(filtered_dataset, v => d3.sum(v, d => d.na_sales), d => d[x_selected]);
+        bar_chart_render();
+      }
+    else if(y_selected == "Europe Sales in Millions USD"){
+        _dataset = d3.rollups(filtered_dataset, v => d3.sum(v, d => d.eu_sales), d => d[x_selected]);
+        bar_chart_render();
+      }
+    else if(y_selected == "Japan Sales in Millions USD"){
+        _dataset = d3.rollups(filtered_dataset, v => d3.sum(v, d => d.jp_sales), d => d[x_selected]);
+        bar_chart_render();
+      }
+	  });
+		/*
+		d3.select("#y_axis_selector")
+	  .on("change", function(d) {
+	   
+	   if(this.value == "Number of Observations"){
+        _dataset = d3.rollups(filtered_dataset, v => v.length, d => d[x_selected]);
+        bar_chart_render();
+      }
+     else if(this.value == "Global Sales in Millions USD"){
+        _dataset = d3.rollups(filtered_dataset, v => d3.sum(v, d => d.global_sales), d => d[x_selected]);
+        bar_chart_render();
+      }
+    else if(this.value == "North America Sales in Millions USD"){
+        _dataset = d3.rollups(filtered_dataset, v => d3.sum(v, d => d.na_sales), d => d[x_selected]);
+        bar_chart_render();
+      }
+    else if(this.value == "Europe Sales in Millions USD"){
+        _dataset = d3.rollups(filtered_dataset, v => d3.sum(v, d => d.eu_sales), d => d[x_selected]);
+        bar_chart_render();
+      }
+    else if(this.value == "Japan Sales in Millions USD"){
+        _dataset = d3.rollups(filtered_dataset, v => d3.sum(v, d => d.jp_sales), d => d[x_selected]);
+        bar_chart_render();
+      }
+	  });
+	  */
+ 
+   /**********
+ **********/
+ 
+  
+  function bar_chart_render(){
+
+  d3.selectAll("rectangle").remove();
+  d3.selectAll('rect').remove();
+  d3.selectAll('text').remove();
+  d3.selectAll('#xAxis').remove();
+  d3.selectAll('#yAxis').remove();
+  
+
+  _dataset = _dataset.slice().sort((a, b) => d3.ascending(a[0], b[0]));
+
+    var y = d3.scaleLinear()
+			.domain([0, d3.max(_dataset, function(d){
+				return +d[1];
+			})])
+			.range([0, -500]);
+
+	var x = d3.scaleBand()
+			.domain(_dataset.map(function(d){ return d[0];}))
+			.range([0, width])
+			.padding(0.1);
+			
+
+	var xAxis = d3.axisBottom()
+		.scale(x);
+
+	var yAxis = d3.axisLeft()
+		.scale(y)
+		.tickFormat(d3.format("~s"));
+
+	svg.append("g")
+    	.attr("class", "x axis")
+    	.attr('id', 'xAxis')
+    	.attr("transform", "translate(0," - height + ")")
+    	.call(xAxis)
+    	.append("text")
+         .attr("y", 40)
+         .attr("x", 350)
+         .attr("text-anchor", "middle")
+         .attr("stroke", "black")
+         .text(x_axis_selector.value);
+
+ 	svg.append("g")
+    	.attr("class", "y axis")
+    	.attr('id', 'yAxis')
+    	.call(yAxis)
+    	.append("text")
+         .attr("transform", "rotate(-90)")
+         .attr("y", 20)
+         .attr("x", 200)
+         .attr("dy", "-6em")
+         .attr("text-anchor", "start")
+         .attr("stroke", "black")
+         .text(y_selected);
+
+	 svg.selectAll("rectangle")
+		.data(_dataset)
+		.enter()
+		.append("rect")
+		.attr("class","rectangle")
+		.attr("width", x.bandwidth())
+		.attr("height", function(d){
+			return 0 - y(d[1]);
+			//return height - y(d[1]);
+		})
+		.attr("x", function(d, i){
+			//return (width / _data_count.length) * i ;
+			return (width / _dataset.length) * i ;
+		})
+		.attr("y", function(d){
+			return y(d[1]);
+		})
+		.append("title")
+		.text(function(d){
+		  if(y_selected == "Number of Observations"){
+			  return d[0] + " : " + Math.round(d[1]) + " observations";
+		  }
+		  else{
+		    return d[0] + " : " + Math.round(d[1] * 10)/10 + " millions USD";
+		  }
+		});
+		
+		svg.append("text")
+        .attr("x", (width / 2 - 150))             
+        .attr("y", -525)
+        .attr("text-anchor", "middle")  
+        .style("font-size", "20px") 
+        .text("Video game sales dataset" + " by: ");
+    	svg.append("text")
+        .attr("x", (width / 2 + 125))             
+        .attr("y", -525)
+        .attr("text-anchor", "middle")  
+        .style("font-size", "20px") 
+        .text(y_selected);
+      svg.append("text")
+        .attr("x", (width / 2))             
+        .attr("y", -505)
+        .attr("text-anchor", "middle")  
+        .style("font-size", "20px") 
+        .text(" and " + x_axis_selector.value);
+        
+  }
+
+  bar_chart_render();
+
+    },1000);
+
+</script>
+
+
+</html>
